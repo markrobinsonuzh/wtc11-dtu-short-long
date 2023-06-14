@@ -104,3 +104,11 @@ write.table(out, "08062023_DTU_gloria_pacbio.tsv", sep = "\t",
 ```
 
 
+
+## `sessionInfo()`
+
+```{r}
+sessionInfo()
+```
+
+

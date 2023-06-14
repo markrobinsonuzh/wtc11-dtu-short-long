@@ -41,6 +41,10 @@ gene_counts <- trans_counts %>% group_by(associated_gene) %>%
   as.data.frame
 
 colSums(gene_counts)
+
+saveRDS(gene_counts, "output/pacbio-gene_counts.rds")
+
+
 ```
 
 
@@ -121,6 +125,8 @@ dev.off()
 write.table(tt$table, "08062023_DGE_gloria_pacbio.tsv", sep = "\t",
             row.names = FALSE, quote = FALSE)
 
+saveRDS(tt, "output/pacbio_edgeR-DGE-topTags-table.rds")
+
 library(GGally)
 
 pdf("ggpairs.pdf", width = 8, height = 8)
@@ -139,6 +145,13 @@ cor(log2(cps[,c(1:3,9:11)]+1), method = "pearson")
 
 
 
+```
+
+
+## `sessionInfo()`
+
+```{r}
+sessionInfo()
 ```
 
 

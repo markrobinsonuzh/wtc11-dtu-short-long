@@ -40,7 +40,8 @@ Here, we read in the SIRV files and parse out the quantitative parts. Also the m
 re <- read_excel("data/SIRV_Set1_Lot_No._00141_sequence-design-overview_20210507a.xlsx", 
            skip = 6, col_names = FALSE, n_max = 100) %>% 
   transmute(transcript_id = `...6`,
-            e0 = `...10`, e1 = `...11`, e2 = `...12`) %>%
+            e0 = `...10`, e1 = `...11`, e2 = `...12`,
+            true_length = `...7`) %>%
   filter(!is.na(e0))
 
 md <- read_excel("data/PacBio_dev_team_revio_samples.xlsx", n_max = 11) %>%
@@ -75,22 +76,24 @@ all(md$name == colnames(st))
 
 ```{r}
 
+ab <- assay(st, "abundance")
+el <- assay(st, "length")
+
 sirvs <- ab %>% as.data.frame %>% 
   rownames_to_column("transcript_id") %>%
   filter(grepl("SIRV",transcript_id)) %>%
   left_join(re) %>%
   select(-e0)
 
-
-e1 <- ggplot(sirvs, aes(x=e1, y=`Day0-1`+.9, label=transcript_id)) + 
+e1 <- ggplot(sirvs, aes(x=e1, y=`Day0-1`+.9, label=transcript_id, colour=true_length)) + 
   geom_jitter(size = 4, width=.01, height=0) +
   geom_text_repel(max.overlaps = 20) +
   scale_x_log10() +
   scale_y_log10() +
   ggtitle("E1 mix")
-# e1
+e1
 
-e2 <- ggplot(sirvs, aes(x=e2, y=`Day5-1`+.9, label=transcript_id)) + 
+e2 <- ggplot(sirvs, aes(x=e2, y=`Day5-1`+.9, label=transcript_id, colour=true_length)) + 
   geom_jitter(size = 4, width=.01, height=0) +
   geom_text_repel(max.overlaps = 20) +
   scale_x_log10() +
@@ -101,8 +104,8 @@ e2 <- ggplot(sirvs, aes(x=e2, y=`Day5-1`+.9, label=transcript_id)) +
 
 eps <- .5
 z <- ggplot(sirvs, aes(x=log2(e2/e1), y=log2((`Day5-1`+eps)/(`Day0-1`+eps)),
-                        label=transcript_id)) + 
-  geom_jitter(size = 4, width=.01, height=0) +
+                        label=transcript_id, colour=length)) + 
+  geom_jitter(size = 4, width=.1, height=0) +
   geom_text_repel(max.overlaps = 20) +
   ggtitle(paste0("log-fold-changes (eps = ", eps, ")"))
 # z
@@ -110,6 +113,22 @@ z <- ggplot(sirvs, aes(x=log2(e2/e1), y=log2((`Day5-1`+eps)/(`Day0-1`+eps)),
 
 cowplot::plot_grid(e1, e2, z, nrow=1)
 
+sirvs_el <- el %>% as.data.frame %>% 
+  rownames_to_column("transcript_id") %>%
+  filter(grepl("SIRV",transcript_id)) %>%
+  left_join(re) %>%
+  select(-e0)
+
+elp <- ggplot(sirvs_el, aes(x=true_length, y=`Day0-1`, label=transcript_id)) +
+  geom_point() +
+  geom_text_repel(max.overlaps = 20) +
+  scale_x_sqrt() +
+  scale_y_sqrt() +
+  geom_abline() +
+  ylab("effective length (from salmon)")
+elp
+
+cowplot::plot_grid(e1, e2, elp, nrow=1)
 ```
 
 

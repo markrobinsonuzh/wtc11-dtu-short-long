@@ -1,0 +1,72 @@
+---
+title: "Quick compare of DE b/w PacBio and Illumina"
+format: html
+self-contained: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## Load packages
+
+```{r warning=FALSE, message=FALSE}
+library(tidyr)
+library(dplyr)
+library(readr)
+library(tibble)
+library(edgeR)
+library(pheatmap)
+```
+
+
+## Read in the PacBio data
+
+Here, we read in the PacBio processed data ..
+
+```{r}
+tt <- readRDS("output/pacbio_edgeR-DGE-topTags-table.rds")
+dim(tt$table)
+```
+
+
+## Read in the Illumine data 
+
+Here, we read in the gene-level quants ..
+
+```{r}
+x <- readRDS("data/edgeR_dge.rds")
+g <- x$sg
+
+dim(g)
+
+gene_overlap <- intersect(rowData(g)$SYMBOL, tt$table$associated_gene)
+length(gene_overlap)
+
+m_g <- match(gene_overlap, rowData(g)$SYMBOL)
+m_tt <- match(gene_overlap, tt$table$associated_gene)
+
+g <- g[m_g,]
+
+tt <- tt[m_tt,]
+
+cnts <- counts(g)
+eps <- .5
+ratio <- (cnts[,"20230519_Day5-1_LS11085_S135"]+eps) / (cnts[,"20230519_Day0-1_LS11085_S130"]+eps)
+
+
+plot(log2(ratio), tt$table$logFC, xlab="Illumina", 
+     ylab="PacBio", pch=19, cex=2, cex.lab=1.5,
+     main = "log2 [Day5 / Day0]", cex.main = 2)
+
+cor(log2(ratio), tt$table$logFC)
+
+# gene_overlap <- intersect(rowData(g)$gene_name, tt$table$associated_gene)
+```
+
+
+## `sessionInfo()`
+
+```{r}
+sessionInfo()
+```
+
+
