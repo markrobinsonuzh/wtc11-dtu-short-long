@@ -1,5 +1,5 @@
 ---
-title: "DTU from David's tables"
+title: "DTU from Illumina (salmon quants)"
 format: html
 self-contained: true
 editor_options: 
@@ -8,7 +8,7 @@ editor_options:
 
 ## DGE analysis
 
-Here, we will run a preliminary vanilla edgeR analysis for the PacBio Revio data from Gloria and Madison, in order to get some quick DGE results.
+Here, we will run a preliminary vanilla `DRIMSeq` analysis for the Illumina data from Gloria and Madison, in order to get some quick DTU results.
 
 ## Load packages
 
@@ -19,31 +19,40 @@ library(readr)
 library(tibble)
 library(DRIMSeq)
 library(pheatmap)
+library(SingleCellExperiment)
 ```
 
 ## Read in the transcript-level data and aggregate it
 
-Here, we read in the transcript counts, and aggegrate them at the gene-level.
+Here, we read in the transcript counts, and organize transcript and gene identifiers.
 
 ```{r}
-# trans_file <- "data/20230606_wtc11_diff_combined_transcript_reads.tsv"
-trans_file <- "data/20230606_wtc11_diff_combined_transcript_reads_11_samples_min.tsv"
 
-trans_counts <- read_tsv(trans_file) %>% 
-  replace(is.na(.), 0) %>%
-  as.data.frame %>%
-  transmute(gene_id = associated_gene,
-         feature_id = isoform,
-         day0_1 = `0-1`,
-         day0_2 = `0-2`,
-         day0_3 = `0-3`,
-         day5_1 = `5-1`,
-         day5_2 = `5-2`,
-         day5_3 = `5-3`)
+x <- readRDS("data/edgeR_dge.rds")
 
-md <- data.frame(sample_id = paste0("day",c(0,0,0,5,5,5),"_",c(1:3,1:3)),
+md <- data.frame(sample_id = paste0("Day",c(0,0,0,5,5,5),"-",c(1:3,1:3)),
                  group = rep(c("day0","day5"), each=3))
 md
+
+st <- x$st
+
+m <- match(md$sample_id, colData(st)$label)
+st <- st[,m]
+rs <- rowSums(counts(st))>0
+st <- st[rs,]
+
+dim(st)
+
+tcounts <- counts(st)
+colnames(tcounts) <- md$sample_id
+
+
+trans_counts <- data.frame(gene_id = rowData(st)$gene_id,
+                           feature_id = rowData(st)$tx_id,
+                           tcounts, check.names = FALSE)
+
+head(trans_counts, 2)
+
 
 ```
 
@@ -65,7 +74,7 @@ plotData(d)
 d <- dmFilter(d, min_samps_gene_expr = 3, min_samps_feature_expr = 3,
               min_gene_expr = 100, min_feature_expr = 20)
 
-design_full <- model.matrix(~ group, data = samples(d))
+design_full <- model.matrix(~ group, data = DRIMSeq::samples(d))
 design_full
 
 
@@ -75,29 +84,31 @@ d <- dmFit(d, design = design_full, verbose = 1)
 
 d <- dmTest(d, coef = "groupday5", verbose = 1)
 
-res <- results(d)
+res <- results(d) %>% left_join(rowData(st) %>% 
+                                  as.data.frame %>% 
+                                  select(gene_id, gene_name),
+                                multiple = 'first')
 res %>% arrange(adj_pvalue) %>% head(20)
 
 sum(res$adj_pvalue < .05, na.rm = TRUE)
 
+# SLC29A1
+plotProportions(d, gene_id = "ENSG00000112759.19", group_variable = "group")
+trans_counts %>% filter(gene_id=="ENSG00000112759.19")
 
-plotProportions(d, gene_id = "RBM7", group_variable = "group")
-trans_counts %>% filter(gene_id=="RBM7")
+# ERG
+plotProportions(d, gene_id = "ENSG00000157554.20", group_variable = "group")
+trans_counts %>% filter(gene_id=="ENSG00000157554.20")
 
-plotProportions(d, gene_id = "RPF2", group_variable = "group")
-trans_counts %>% filter(gene_id=="RPF2")
-
-plotProportions(d, gene_id = "RBM7", group_variable = "group")
-trans_counts %>% filter(gene_id=="RBM7")
-
-plotProportions(d, gene_id = "ARHGDIB", group_variable = "group")
-trans_counts %>% filter(gene_id=="ARHGDIB")
+plotProportions(d, gene_id = "ENSG00000081051.8", group_variable = "group")
+trans_counts %>% filter(gene_id=="ENSG00000081051.8")
 
 
 out <- trans_counts %>% left_join(res)
 
+
 # write statistics to table
-write.table(out, "08062023_DTU_gloria_pacbio.tsv", sep = "\t",
+write.table(out, "21062023_DTU_gloria_illumina.tsv", sep = "\t",
             row.names = FALSE, quote = FALSE)
 
 

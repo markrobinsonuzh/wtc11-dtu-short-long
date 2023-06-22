@@ -1,5 +1,5 @@
 ---
-title: "DGE from David's tables"
+title: "DGE from Illumina/salmon quants with edgeR"
 format: html
 self-contained: true
 editor_options: 
@@ -8,7 +8,7 @@ editor_options:
 
 ## DGE analysis
 
-Here, we will run a preliminary vanilla edgeR analysis for the PacBio Revio data from Gloria and Madison, in order to get some quick DGE results.
+Here, we will run a preliminary vanilla edgeR analysis for the Illumina data from Gloria and Madison, in order to get some quick DGE results.
 
 ## Load packages
 
@@ -19,31 +19,38 @@ library(readr)
 library(tibble)
 library(edgeR)
 library(pheatmap)
+library(tximeta)
+library(SingleCellExperiment)
+library(ggplot2)
+library(GGally)
 ```
 
 ## Read in the transcript-level data and aggregate it
 
-Here, we read in the transcript counts, and aggegrate them at the gene-level.
+Here, we read in the edgeR object from `ARMOR`.
 
 ```{r}
-# trans_file <- "data/20230606_wtc11_diff_combined_transcript_reads.tsv"
-trans_file <- "data/20230606_wtc11_diff_combined_transcript_reads_11_samples_min.tsv"
+x <- readRDS("data/edgeR_dge.rds")
 
-trans_counts <- read_tsv(trans_file) %>% 
-  replace(is.na(.), 0) %>%
-  as.data.frame 
+# bit of code here taken from `ARMOR` reports
+sg <- x$sg
+metadata <- colData(sg)
 
-colSums(trans_counts[,-c(1:3)])
+df <- data.frame(totCount = colSums(assay(sg, "counts")), 
+                 sample = colnames(assay(sg, "counts")), 
+                 stringsAsFactors = FALSE)
 
-gene_counts <- trans_counts %>% group_by(associated_gene) %>%
-  select(-transcript_id, -isoform) %>%
-  summarise_all(sum) %>% column_to_rownames("associated_gene") %>%
-  as.data.frame
+ggplot(df, aes(x = sample, y = totCount)) + 
+  geom_bar(stat = "identity") + 
+  theme_bw() + xlab("") + ylab("Total read count") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 
-colSums(gene_counts)
+dge0 <- tximeta::makeDGEList(sg)
+dge0$genes <- as.data.frame(rowRanges(sg))
 
-saveRDS(gene_counts, "output/pacbio-gene_counts.rds")
-
+# keep <- edgeR::filterByExpr(dge0, design = des)
+# dge <- dge0[keep, ]
+# dim(dge)
 
 ```
 
@@ -53,42 +60,48 @@ saveRDS(gene_counts, "output/pacbio-gene_counts.rds")
 
 ```{r, fig.width=8, fig.height=6}
 
-# create edgeR container for the counts
-d <- DGEList(counts=gene_counts)
-
 # filter: CPM > 1 in at least 3 samples
-cps <- cpm(d)
+cps <- edgeR::cpm(dge0)
 rs <- rowSums(cps > 1) >= 3
-table(rs)
-d <- d[rs,]
 
-# normalization
-d <- calcNormFactors(d)
+dge <- dge0[rs, ]
+dim(dge)
+
+# # normalization
+# dge <- calcNormFactors(dge)
 
 
 # grouping variable (for design matrix)
-(grp <- paste0("day", sapply(strsplit(colnames(d), "-", fixed=TRUE), .subset, 1)))
+ss <- strsplit(colnames(dge), "_", fixed=TRUE)
+day <- sapply(ss, function(u) ifelse(grepl("2023",u[1]), u[2], u[1]))
 
+colnames(dge) <- day
+
+(grp <- sapply(strsplit(day, "-", fixed=TRUE), .subset, 1))
+
+table(grp)
 # design matrix
 (mm <- model.matrix(~0+grp))
 
 # book-keeping to include things in the table
-d$genes <- data.frame(associated_gene = rownames(gene_counts)[rs])
-cps <- cpm(d)
-colnames(cps) <- paste0("s", colnames(cps))
-d$genes <- data.frame(d$genes, round(cpm(d), 2))
-head(d$genes)
+dge$genes <- dge$genes[,c(1:3,5:6,9)]
+
+cps <- edgeR::cpm(dge)
+cps <- cps[,order(colnames(cps))]
+dge$genes <- data.frame(dge$genes, round(cps, 2))
+
+head(dge$genes)
 
 # estimate dispersion
-d <- estimateDisp(d,mm)
+dge <- estimateDisp(dge,mm)
 
 # quick plot for diagnosis
-plotBCV(d)
-plotMDS(d, cex = 2)
+plotBCV(dge)
+plotMDS(dge, cex = 2)
 
 # fit GLM; test for diff b/w day 5 and day 0
-f <- glmQLFit(d,mm)
-mc <- makeContrasts(grpday5-grpday0, levels=colnames(mm))
+f <- glmQLFit(dge,mm)
+mc <- makeContrasts(grpDay5-grpDay0, levels=colnames(mm))
 qlf <- glmQLFTest(f,contrast = mc)
 
 # quick look at top genes
@@ -112,31 +125,31 @@ plotMD(qlf, ylim=c(-5,5))
 # table(w)
 # cpm(d)[w,][,c(1:3,9:11)]
 
-table(w <- tt$table$FDR < .005 & abs(tt$table$logFC) > 3)
+table(w <- tt$table$FDR < .001 & abs(tt$table$logFC) > 4)
 
 
-pdf("quick_heatmap.pdf", height=20, width=8)
+pdf("quick_heatmap.pdf", height=30, width=8)
 pheatmap(log2(1+cps[w,c(1:3,9:11)]), 
          fontsize_row = 8)
 dev.off()
 
 
 # write statistics to table
-write.table(tt$table, "08062023_DGE_gloria_pacbio.tsv", sep = "\t",
+write.table(tt$table, "22062023_DGE_gloria_illumina.tsv", sep = "\t",
             row.names = FALSE, quote = FALSE)
 
-saveRDS(tt, "output/pacbio_edgeR-DGE-topTags-table.rds")
+saveRDS(tt, "output/illumina_edgeR-DGE-topTags-table.rds")
 
-library(GGally)
+
 
 pdf("ggpairs.pdf", width = 8, height = 8)
 ggpairs( as.data.frame(log2(cps[,c(1:3,9:11)]+1)) )
 dev.off()
 
 
-png("ggpairs_t.png", width = 800, height = 800)
-ggpairs( as.data.frame(log2(1+trans_counts[,-c(1:3)][,c(1:3,9:11)])) )
-dev.off()
+# png("ggpairs_t.png", width = 800, height = 800)
+# ggpairs( as.data.frame(log2(1+trans_counts[,-c(1:3)][,c(1:3,9:11)])) )
+# dev.off()
 
 
 cor(log2(cps[,c(1:3,9:11)]+1), method = "spearman")
