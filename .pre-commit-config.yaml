@@ -4,13 +4,13 @@ default_language_version:
 
 repos:
   - repo: https://github.com/lorenzwalthert/precommit
-    rev: v0.3.2.9007
+    rev: 0.3.2
     hooks:
       - id: style-files
         args:
           ['--ignore-start="^# styler: off$"', '--ignore-stop="^# styler: on$"']
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: 4.4.0
     hooks:
       - id: check-added-large-files
         args: ["--maxkb=200"]
@@ -19,6 +19,14 @@ repos:
       - id: end-of-file-fixer
       - id: trailing-whitespace
   - repo: https://github.com/psf/black
-    rev: 22.10.0
+    rev: 23.7.0
     hooks:
     - id: black
+  - repo: https://github.com/snakemake/snakefmt
+    rev: 0.8.4
+    hooks:
+    - id: snakefmt 
+  - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
+    rev: 0.2.1
+    hooks:
+    - id: yamlfmt
