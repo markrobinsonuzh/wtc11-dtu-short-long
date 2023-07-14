@@ -1,0 +1,77 @@
+from snakemake.utils import min_version
+
+min_version("7.30.1")
+
+SAMPLES = ["day0-rep1", "day0-rep2", "day0-rep3", "day5-rep1", "day5-rep2", "day5-rep3"]
+
+
+rule all:
+    input:
+        expand("results/{samples}.aligned.sorted.bam.bai", samples=SAMPLES),
+
+
+rule mapping_convert_ubam_to_fastqz:
+    input:
+        "data-raw/{sample}.bam",
+    output:
+        "results/{sample}.fastq.gz",
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/bam2fastq.yaml"
+    shell:
+        "bam2fastq -o {output} {input}"
+
+
+rule mapping_convert_gtf_to_bed:
+    input:
+        "data-raw/human_GRCh38_no_alt_plus_SIRV4.gtf",
+    output:
+        "results/human_GRCh38_no_alt_plus_SIRV4.bed",
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/minimap2.yaml"
+    shell:
+        "paftools.js gff2bed {input} > {output}"
+
+
+rule mapping_run_minimap2:
+    input:
+        reads="data-raw/{sample}.fastq.gz",
+        bed="results/human_GRCh38_no_alt_plus_SIRV4.bed",
+        ref="data-raw/human_GRCh38_no_alt_plus_SIRV4.fasta",
+    output:
+        "results/{sample}.aligned.bam",
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/minimap2.yaml"
+    shell:
+        "minimap2 -ax splice:hq -t {threads} --junc-bed {input.bed} {input.ref} {input.reads} > {output}"
+
+
+rule mapping_sort_mapped_files:
+    input:
+        "results/{sample}.aligned.bam",
+    output:
+        "results/{sample}.aligned.sorted.bam",
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/samtools.yaml"
+    shell:
+        "samtools sort {input} -o {output}"
+
+
+rule mapping_index_mapped_files:
+    input:
+        "results/{sample}.aligned.sorted.bam",
+    output:
+        "results/{sample}.aligned.sorted.bam.bai",
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/samtools.yaml"
+    shell:
+        "samtools index {input} -o {output}"
