@@ -7,7 +7,8 @@ SAMPLES = ["day0-rep1", "day0-rep2", "day0-rep3", "day5-rep1", "day5-rep2", "day
 
 rule all:
     input:
-        expand("results/{samples}.aligned.sorted.bam.bai", samples=SAMPLES),
+        "results/quant_salmon",
+        "results/quant_bambu",
 
 
 rule mapping_convert_ubam_to_fastqz:
@@ -75,3 +76,55 @@ rule mapping_index_mapped_files:
         "envs/samtools.yaml"
     shell:
         "samtools index {input} -o {output}"
+
+
+rule mapping_create_transcriptome:
+    input:
+        ref="data-raw/human_GRCh38_no_alt_plus_SIRV4.fasta",
+        gtf="data-raw/human_GRCh38_no_alt_plus_SIRV4.gtf",
+    output:
+        "results/human_GRCh38_no_alt_plus_SIRV4_transcriptome.fasta",
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/gffread.yaml"
+    shell:
+        "gffread -w {output} -g {input.ref} {input.gtf}"
+
+
+rule quant_quantify_isoquant:
+    input:
+        reads=expand("results/{samples}.aligned.sorted.bam", samples=SAMPLES),
+        indices=expand("results/{samples}.aligned.sorted.bam.bai", samples=SAMPLES),
+        annotation="results/human_GRCh38_no_alt_plus_SIRV4.db",
+        reference="data-raw/human_GRCh38_no_alt_plus_SIRV4.fasta",
+    output:
+        directory("results/quant_isoquant"),
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/isoquant.yaml"
+    shell:
+        """isoquant.py --reference {input.reference} \
+            --genedb {input.annotation} \
+            --bam {input.reads} \
+            --data_type pacbio_ccs -o {output} \
+            --complete_genedb \
+            --no_model_construction \
+            --threads {threads}"""
+
+
+rule quant_quantify_bambu:
+    input:
+        reads=expand("results/{samples}.aligned.sorted.bam", samples=SAMPLES),
+        indices=expand("results/{samples}.aligned.sorted.bam.bai", samples=SAMPLES),
+        annotation="data-raw/human_GRCh38_no_alt_plus_SIRV4.gtf",
+        reference="data-raw/human_GRCh38_no_alt_plus_SIRV4.fasta",
+    output:
+        directory("results/quant_bambu"),
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/bambu.yaml"
+    script:
+        "scripts/run_bambu.R"

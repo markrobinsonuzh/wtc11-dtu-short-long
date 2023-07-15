@@ -1,0 +1,9 @@
+name: bambu
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base=4.2.3
+  - r-biocmanager=1.30.21
+  - bioconductor-bambu=3.0.8
