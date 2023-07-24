@@ -1,77 +1,170 @@
 from snakemake.utils import min_version
 
+import os
+
+def list_files_in_directory(directory):
+    return [os.path.join(directory, f) for f in os.listdir(directory)]
+
 min_version("7.30.1")
 
-SAMPLES = ["day0-rep1", "day0-rep2", "day0-rep3", "day5-rep1", "day5-rep2", "day5-rep3"]
+SAMPLES = ["day0-rep1-sirvs", "day0-rep2-sirvs", "day0-rep3-sirvs", "day5-rep1-sirvs", "day5-rep2-sirvs", "day5-rep3-sirvs"]
+PERCS = ["0%","10%","20%","30%","40%","50%","60%","70%","80%","90%","100%"]
+
 
 
 rule all:
     input:
-        expand("results/{samples}.aligned.sorted.bam.bai", samples=SAMPLES),
+        expand("bambu/all_samples_{perc}_anno/gffcmp",perc=PERCS),
+        # expand("isoquant/all_samples_{perc}_anno",perc=PERCS),
+        expand("SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a_sampled_{perc}_complement.gtf",perc=PERCS),
+        expand("bambu/all_samples_{perc}_anno/gffcmp_retained",perc=PERCS),
+        expand("bambu/all_samples_{perc}_anno/gffcmp_removed",perc=PERCS)
 
-
-rule mapping_convert_ubam_to_fastqz:
+rule samtools_sort:
     input:
-        "data-raw/{sample}.bam",
+        "/home/Shared/data/seq/sheynkman_pb_mas_wtc11/data-raw/{sample}.aligned.bam"
     output:
-        "results/{sample}.fastq.gz",
+        "sorted_reads/{sample}.aligned.sorted.bam"
     singularity:
         "docker://condaforge/mambaforge:23.1.0-3"
     conda:
-        "envs/bam2fastq.yaml"
-    shell:
-        "bam2fastq -o {output} {input}"
+        "envs/samtools.yaml"
+    shell: 
+        "samtools sort -T sorted_reads/{wildcards.sample} -O bam {input} > {output}"
 
-
-rule mapping_convert_gtf_to_bed:
+rule samtools_index:
     input:
-        "data-raw/human_GRCh38_no_alt_plus_SIRV4.gtf",
+        "sorted_reads/{sample}.aligned.sorted.bam"
     output:
-        "results/human_GRCh38_no_alt_plus_SIRV4.bed",
-    singularity:
-        "docker://condaforge/mambaforge:23.1.0-3"
-    conda:
-        "envs/minimap2.yaml"
-    shell:
-        "paftools.js gff2bed {input} > {output}"
-
-
-rule mapping_run_minimap2:
-    input:
-        reads="data-raw/{sample}.fastq.gz",
-        bed="results/human_GRCh38_no_alt_plus_SIRV4.bed",
-        ref="data-raw/human_GRCh38_no_alt_plus_SIRV4.fasta",
-    output:
-        "results/{sample}.aligned.bam",
-    singularity:
-        "docker://condaforge/mambaforge:23.1.0-3"
-    conda:
-        "envs/minimap2.yaml"
-    shell:
-        "minimap2 -ax splice:hq -t {threads} --junc-bed {input.bed} {input.ref} {input.reads} > {output}"
-
-
-rule mapping_sort_mapped_files:
-    input:
-        "results/{sample}.aligned.bam",
-    output:
-        "results/{sample}.aligned.sorted.bam",
+        "sorted_reads/{sample}.aligned.sorted.bam.bai"
     singularity:
         "docker://condaforge/mambaforge:23.1.0-3"
     conda:
         "envs/samtools.yaml"
     shell:
-        "samtools sort {input} -o {output}"
+        "samtools index {input}"
 
-
-rule mapping_index_mapped_files:
+rule subsample_annotations:
     input:
-        "results/{sample}.aligned.sorted.bam",
+        "SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a.gtf"
     output:
-        "results/{sample}.aligned.sorted.bam.bai",
+        expand("SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a_sampled_{perc}.gtf", perc=PERCS)
     singularity:
         "docker://condaforge/mambaforge:23.1.0-3"
     conda:
-        "envs/samtools.yaml"
+        "envs/bambu.yaml"
     shell:
-        "samtools index {input} -o {output}"
+        "Rscript scripts/anno_randomsampler.R {input}"
+
+rule subsample_annotations_complement:
+    input:
+        full_annotation="SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a.gtf",
+        sampled_annotation="SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a_sampled_{perc}.gtf"
+    output:
+        "SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a_sampled_{perc}_complement.gtf"
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/bambu.yaml"
+    threads: 4
+    script:
+        "scripts/anno_randomsampler_comp.R"
+    
+
+rule bambu_generate_rcfiles:
+    input:
+        bam_files=expand("sorted_reads/{sample}.aligned.sorted.bam",sample=SAMPLES),
+        bam_indices=expand("sorted_reads/{sample}.aligned.sorted.bam.bai", sample=SAMPLES),
+        annotation="SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a_sampled_{perc}.gtf",
+        reference="SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta_170612a.fasta"
+    output:
+        out=directory("bambu/rc_files/all_samples_{perc}_anno")
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/bambu.yaml"
+    threads: 4
+    log:
+        "logs/bambu_generate_rcfiles/all_samples_{perc}_anno"
+    script:
+        "scripts/bambu_gen_rcfiles.R"
+
+rule bambu_multisamples_multianno_discovery:
+    input:
+        rc_files="bambu/rc_files/all_samples_{perc}_anno",
+        annotation="SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a_sampled_{perc}.gtf",
+        reference="SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta_170612a.fasta"
+    output:
+        out=directory("bambu/all_samples_{perc}_anno/discovery")
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/bambu.yaml"
+    log:
+        "logs/bambu_multisamples_multianno_discovery/all_samples_{perc}_anno.log"
+    script:
+        "scripts/bambu_multisamples_multianno.R"
+
+rule bambu_gffcompare_full:
+    input:
+        full_annotation="SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a_sampled_100%.gtf", 
+        extended_annotation="bambu/all_samples_{perc}_anno/discovery"
+    output:
+        directory("bambu/all_samples_{perc}_anno/gffcmp")
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/gffcompare.yaml"
+    shell:
+        """
+        mkdir -p {output}
+        cd {output}
+        gffcompare -r ../../../{input.full_annotation} ../discovery/extended_annotations.gtf
+        """
+
+rule bambu_gffcompare_partial:
+    input:
+        retained_annotation="SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a_sampled_{perc}.gtf", 
+        removed_annotation="SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a_sampled_{perc}_complement.gtf",
+        extended_annotation="bambu/all_samples_{perc}_anno/discovery"
+    output:
+        out_retained=directory("bambu/all_samples_{perc}_anno/gffcmp_retained"),
+        out_removed=directory("bambu/all_samples_{perc}_anno/gffcmp_removed")
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/gffcompare.yaml"
+    shell:
+        """
+        mkdir -p {output.out_retained}
+        cd {output.out_retained}
+        gffcompare -T -r ../../../{input.retained_annotation} ../discovery/extended_annotations.gtf
+
+        cd ../../..
+
+        mkdir -p {output.out_removed}
+        cd {output.out_removed}
+        gffcompare -T -r ../../../{input.removed_annotation} ../discovery/extended_annotations.gtf
+
+        """
+
+rule isoquant_discovery:
+    input:
+        reads=expand("sorted_reads/{sample}.aligned.sorted.bam", sample=SAMPLES),
+        indices=expand("sorted_reads/{sample}.aligned.sorted.bam.bai", sample=SAMPLES),
+        annotation="SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a_sampled_{perc}.gtf",
+        reference="SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta_170612a.fasta",
+    output:
+        directory("isoquant/all_samples_{perc}_anno"),
+    singularity:
+        "docker://condaforge/mambaforge:23.1.0-3"
+    conda:
+        "envs/isoquant.yaml"
+    threads: 4
+    shell:
+        """isoquant.py --reference {input.reference} \
+            --genedb {input.annotation} \
+            --bam {input.reads} \
+            --data_type pacbio_ccs -o {output} \
+            --complete_genedb \
+            --threads {threads}"""

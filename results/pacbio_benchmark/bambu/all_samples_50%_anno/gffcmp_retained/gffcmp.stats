@@ -1,0 +1,30 @@
+# gffcompare v0.12.6 | Command line was:
+#gffcompare -T -r ../../../SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a_sampled_50%.gtf ../discovery/extended_annotations.gtf
+#
+
+#= Summary for dataset: ../discovery/extended_annotations.gtf 
+#     Query mRNAs :      68 in      19 loci  (66 multi-exon transcripts)
+#            (12 multi-transcript loci, ~3.6 transcripts per locus)
+# Reference mRNAs :      35 in      14 loci  (33 multi-exon)
+# Super-loci w/ reference transcripts:       14
+#-----------------| Sensitivity | Precision  |
+        Base level:   100.0     |    66.4    |
+        Exon level:   100.0     |    68.4    |
+      Intron level:   100.0     |    68.3    |
+Intron chain level:   100.0     |    50.0    |
+  Transcript level:   100.0     |    51.5    |
+       Locus level:   100.0     |    73.7    |
+
+     Matching intron chains:      33
+       Matching transcripts:      35
+              Matching loci:      14
+
+          Missed exons:       0/124	(  0.0%)
+           Novel exons:      45/193	( 23.3%)
+        Missed introns:       0/82	(  0.0%)
+         Novel introns:      23/120	( 19.2%)
+           Missed loci:       0/14	(  0.0%)
+            Novel loci:       5/19	( 26.3%)
+
+ Total union super-loci across all input datasets: 19 
+68 out of 68 consensus transcripts written in gffcmp.annotated.gtf (0 discarded as redundant)

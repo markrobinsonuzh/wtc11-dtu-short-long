@@ -1,0 +1,10 @@
+# gffcompare v0.12.6 | Command line was:
+#gffcompare -T -r ../../../SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a_sampled_100%_complement.gtf ../discovery/extended_annotations.gtf
+#
+
+#= Summary for dataset: ../discovery/extended_annotations.gtf 
+#     Query mRNAs :      88 in      22 loci  (80 multi-exon transcripts)
+#            (14 multi-transcript loci, ~4.0 transcripts per locus)
+
+ Total union super-loci across all input datasets: 22 
+88 out of 88 consensus transcripts written in gffcmp.combined.gtf (0 discarded as redundant)

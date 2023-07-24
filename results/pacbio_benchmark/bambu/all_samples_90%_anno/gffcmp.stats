@@ -1,0 +1,30 @@
+# gffcompare v0.12.6 | Command line was:
+#/home/asamant/gffcompare/bin/gffcompare-0.12.6.Linux_x86_64/gffcompare -r /home/asamant/pacbio_benchmark/bambu/SIRV_Set1_Norm_Sequences_20210507/SIRV_isoforms_multi-fasta-annotation_C_170612a.gtf extended_annotations.gtf
+#
+
+#= Summary for dataset: extended_annotations.gtf 
+#     Query mRNAs :      84 in      21 loci  (77 multi-exon transcripts)
+#            (14 multi-transcript loci, ~4.0 transcripts per locus)
+# Reference mRNAs :      69 in      18 loci  (61 multi-exon)
+# Super-loci w/ reference transcripts:       17
+#-----------------| Sensitivity | Precision  |
+        Base level:    97.9     |    77.4    |
+        Exon level:    97.9     |    82.7    |
+      Intron level:   100.0     |    85.1    |
+Intron chain level:    93.4     |    74.0    |
+  Transcript level:    92.8     |    76.2    |
+       Locus level:    94.4     |    81.0    |
+
+     Matching intron chains:      57
+       Matching transcripts:      64
+              Matching loci:      17
+
+          Missed exons:       1/189	(  0.5%)
+           Novel exons:      38/220	( 17.3%)
+        Missed introns:       0/114	(  0.0%)
+         Novel introns:      20/134	( 14.9%)
+           Missed loci:       1/18	(  5.6%)
+            Novel loci:       4/21	( 19.0%)
+
+ Total union super-loci across all input datasets: 21 
+84 out of 84 consensus transcripts written in gffcmp.annotated.gtf (0 discarded as redundant)
