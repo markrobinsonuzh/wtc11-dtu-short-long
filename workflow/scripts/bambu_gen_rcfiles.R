@@ -13,8 +13,8 @@ if (!dir.exists(out_dir)){
 }
 
 if (grepl("_0%",gtf_file)){
-  se <- bambu(reads = bam_paths, rcOutDir = out_dir, genome = fa_file, discovery = FALSE, quant = FALSE, ncore = 4)
+  se <- bambu(reads = bam_paths, rcOutDir = out_dir, genome = fa_file, discovery = FALSE, quant = FALSE, ncore = 8)
 } else {
   bambuAnnotations <- prepareAnnotations(gtf_file)
-  se <- bambu(reads = bam_paths, rcOutDir = out_dir, annotations = bambuAnnotations, genome = fa_file, discovery = FALSE, quant = FALSE, ncore = 4)
+  se <- bambu(reads = bam_paths, rcOutDir = out_dir, annotations = bambuAnnotations, genome = fa_file, discovery = FALSE, quant = FALSE, ncore = 8)
 }
