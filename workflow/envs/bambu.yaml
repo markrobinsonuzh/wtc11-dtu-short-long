@@ -4,6 +4,5 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - r-base=4.2.3
-  - r-biocmanager=1.30.21
-  - bioconductor-bambu=3.0.8
+  - r-biocmanager=1.30.22
+  - bioconductor-bambu=3.2.4

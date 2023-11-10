@@ -1,8 +1,0 @@
-name: isoquant
-channels:
-  - conda-forge
-  - bioconda
-  - defaults
-dependencies:
-  - python=3.8.0
-  - isoquant=3.3.0
