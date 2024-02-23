@@ -1,0 +1,158 @@
+---
+title: "DTU from Illumina; trying splines"
+format: html
+self-contained: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## DGE analysis
+
+Here, we will run a preliminary vanilla `DRIMSeq` analysis for the Illumina data from Gloria and Madison, in order to get some quick DTU results.
+
+## Load packages
+
+```{r warning=FALSE, message=FALSE}
+library(dplyr)
+library(readr)
+library(edgeR)
+library(pheatmap)
+library(reshape2)
+library(splines)
+library(ggplot2)
+library(SummarizedExperiment)
+library(cowplot)
+```
+
+## Read in the transcript-level data and aggregate it
+
+Here, we read in the transcript counts, and organize transcript and gene identifiers.
+
+```{r}
+
+x <- readRDS(here::here("data/edgeR_dge.rds"))
+# x <- read_delim("data/counts_transcript.txt", delim = "\t")
+# colnames(x) <- gsub(".aligned.sorted","",
+#                           colnames(x))
+
+# ss <- strsplit(colnames(x)[-c(1:2)], "-", fixed = TRUE)
+# day <- gsub("day","",sapply(ss, .subset, 1)) %>% as.integer
+# rep <- gsub("day","",sapply(ss, .subset, 2)) %>% as.factor
+# 
+# ids <- x[,1:2]
+# cnts <- x[,-c(1:2)]
+
+md <- colData(x$st) %>% as.data.frame
+rownames(md) <- NULL
+md$rep <- paste0("rep",sapply(strsplit(md$label,
+                                 "-", fixed = TRUE),
+                 .subset, 2))
+colnames(md)[1] <- "sample_id"
+md
+
+
+# summary(fm1 <- lm(weight ~ ns(height, df = 2), data = women))
+# plot(women, xlab = "Height (in)", ylab = "Weight (lb)")
+# ht <- seq(57, 73, length.out = 200) ; nD <- data.frame(height = ht)
+# lines(ht, p1 <- predict(fm1, nD))
+
+
+y <- DGEList(counts=counts(x$st) %>% as.matrix,  
+             genes=rowData(x$st) %>% 
+               as.data.frame %>% 
+               select(tx_id, gene_id, gene_name))
+y <- calcNormFactors(y)
+
+table(keep <- rowSums(edgeR::cpm(y) > 1) >= 3)
+y <- y[keep,]
+
+cps <- edgeR::cpm(y)
+
+(mm <- model.matrix(~rep+ns(day, df=2), data=md))
+# (mm <- model.matrix(~rep+ns(day, df=2), data=md))
+# (mm <- model.matrix(~ns(day, df=2), data=md))
+
+y <- estimateDisp(y, design = mm)
+y <- glmFit(y, design = mm, prior.count = 1)
+# ds <- diffSpliceDGE(y, geneid="GENEID", coef=4:5)
+# ds <- diffSpliceDGE(y, geneid="gene_id", contrast = c(0,0,0,1,1,1))
+ds <- diffSpliceDGE(y, geneid="gene_id", contrast = c(0,0,0,1,1))
+
+topSpliceDGE(ds, number = 15)
+
+# s <- sample(nrow(y$counts), 4000)
+# pairs(log(y$counts[s,]+1), lower.panel = NULL, pch=".")
+
+```
+
+
+## Make some viz for what `diffSpliceDGE` found
+
+```{r}
+
+# plotSpliceDGE(ds)
+
+# cps <- edgeR::cpm(y)
+
+goi <- "ENSG00000003436.16"
+
+w <- y$genes$gene_id == goi
+gn <- y$genes$gene_name[y$genes$gene_id==goi][1]
+
+# ENSG00000198561.16
+
+fitted <- y$fitted.values
+rownames(cps) <- rownames(fitted) <- y$genes$tx_id
+colnames(cps) <- rownames(y$samples)
+
+m <- melt(fitted[w,]) %>%
+  setNames(c("txid", "sample_id", "fitted")) %>%
+  left_join(md)
+# m <- melt(cps[w,]) %>% 
+#   setNames(c("txid", "sample_id", "cpm")) %>%
+#   left_join(md)
+
+ggplot(m, aes(x=day, y=fitted, group=txid, colour = txid, shape = rep)) +
+  geom_point(size = 5) +
+  scale_y_sqrt()
+
+
+# z <- mm[,4:6] %*% t(y$coefficients[,4:6])
+z <- mm[,4:5] %*% t(y$coefficients[,4:5])
+
+a <- melt(z[,w]) %>% setNames(c("md_row","tx_id","rel_expr"))
+
+p <- ggplot(a, aes(x = md$day[md_row], y=rel_expr, 
+              colour = tx_id, group = tx_id)) +
+  geom_point(size = 5) +
+  geom_line(size = 3) +
+  ggtitle(paste("Model fits: ", gn)) +
+  xlab("day")
+
+b <- melt(cps[w,]) %>% 
+  setNames(c("tx_id","sample_id","cpm")) %>%
+  left_join(md)
+
+q <- ggplot(b, aes(x = day, y = cpm+.5, 
+              colour = tx_id,
+              shape = rep)) +
+  geom_point(size = 5) +
+  scale_y_log10() +
+  ggtitle(paste("CPMs: ", gn))
+
+
+plot_grid(p,q)
+
+# +
+#   facet_wrap(~tx_id, ncol=1, scales = "free_y")
+
+```
+
+
+## `sessionInfo()`
+
+```{r}
+sessionInfo()
+```
+
+
